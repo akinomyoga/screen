@@ -181,6 +181,7 @@ tags TAGS: $(CFILES)
 
 dist: .version $(SCREEN).tar.gz
 
+
 $(SCREEN).tar: .version term.h comm.h tty.c kmapdef.c
 	-rm -rf dist
 	mkdir dist
@@ -188,7 +189,7 @@ $(SCREEN).tar: .version term.h comm.h tty.c kmapdef.c
 	ln acls.h ansi.h display.h extern.h logfile.h mark.h os.h \
 	   layer.h patchlevel.h screen.h window.h image.h \
 	   osdef.h.in term.sh tty.sh comm.sh osdef.sh braille.h \
-	   sched.h \
+	   sched.h layout.h viewport.h canvas.h list_generic.h \
 	   $(CFILES) \
 	   ChangeLog COPYING INSTALL NEWS* TODO install.sh \
 	   dist/$(SCREEN)
