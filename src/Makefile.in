@@ -124,7 +124,7 @@ shadow:
 	echo "install all Makefiles and config:" > shadow/Makefile
 	echo "	rm -f config.cache" >> shadow/Makefile
 	echo "	sh ./configure" >> shadow/Makefile
-	
+
 term.h: term.c term.sh
 	AWK=$(AWK) srcdir=$(srcdir) sh $(srcdir)/term.sh
 
@@ -194,7 +194,7 @@ $(SCREEN).tar: .version term.h comm.h tty.c kmapdef.c
 	   dist/$(SCREEN)
 	cd dist/$(SCREEN); mv tty.c tty.c.dist
 	cd dist/$(SCREEN); mv kmapdef.c kmapdef.c.dist
-	ln configure.in configure dist/$(SCREEN)
+	ln configure.ac configure dist/$(SCREEN)
 	sed -e 's@"/local/screens@"/tmp/screens@' -e 's@"/local@"/usr/local@g' < config.h.in > dist/$(SCREEN)/config.h.in
 	sed -e 's@[	 ]/local@ /usr/local@g' -e 's/^CFLAGS = -g/CFLAGS = -O/' < Makefile.in > dist/$(SCREEN)/Makefile.in
 	ln term.h dist/$(SCREEN)/term.h.dist
@@ -209,7 +209,7 @@ $(SCREEN).tar: .version term.h comm.h tty.c kmapdef.c
 	mkdir dist/$(SCREEN)/utf8encodings
 	cd utf8encodings; ln * ../dist/$(SCREEN)/utf8encodings
 	# sed -e 's/^startup/#startup/' -e 's/^autodetach/#autodetach/' < $(ETCSCREENRC) > dist/$(SCREEN)/etc/etcscreenrc 
-	cp $(HOME)/.screenrc dist/$(SCREEN)/etc/screenrc
+	# cp $(HOME)/.screenrc dist/$(SCREEN)/etc/screenrc
 	mkdir dist/$(SCREEN)/doc
 	sed -e 's@/local/emacs@/usr/local@g' < doc/Makefile.in > dist/$(SCREEN)/doc/Makefile.in
 	cd doc; ln FAQ README.DOTSCREEN screen.1 screen.texinfo fdpat.ps make.help window_to_display.ps \
@@ -268,7 +268,7 @@ mdepend: $(CFILES) term.h
 
 depend: depend.in
 	./config.status || ./configure
-	
+
 depend.in: $(CFILES) term.h
 	cp Makefile.in Makefile.in~
 	sed -e '/\#\#\# Dependencies/q' < Makefile.in > tmp_make
