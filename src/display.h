@@ -100,6 +100,7 @@ struct display
   int	d_hstatus;		/* hardstatus used */
   int	d_lp_missing;		/* last character on bot line missing */
   int   d_mouse;		/* mouse mode */
+  int   d_mouseprotocol;	/* mouse protocol */
   int	d_mousetrack;		/* set when user wants to use mouse even when the window
 				   does not */
 #ifdef RXVT_OSC
@@ -228,6 +229,7 @@ extern struct display TheDisplay;
 #define D_lp_missing	DISPLAY(d_lp_missing)
 #define D_mouse		DISPLAY(d_mouse)
 #define D_mousetrack	DISPLAY(d_mousetrack)
+#define D_mouseprotocol	DISPLAY(d_mouseprotocol)
 #define D_xtermosc	DISPLAY(d_xtermosc)
 #define D_lpchar	DISPLAY(d_lpchar)
 #define D_status	DISPLAY(d_status)
