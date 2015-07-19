@@ -1288,6 +1288,10 @@ AC_ARG_ENABLE(rxvt_osc, [  --enable-rxvt_osc       enable support for rxvt OSC c
 if test "$enable_rxvt_osc" = "yes"; then
   AC_DEFINE(RXVT_OSC)
 fi
+AC_ARG_ENABLE(ut_time, [  --enable-ut_time      struct utmp::ut_time instead of struct utmp::ut_tv])
+if test "$enable_ut_time" = "yes"; then
+  AC_DEFINE([USE_UT_TIME],[],[struct utmp::ut_time instead of struct utmp::ut_tv])
+fi
 
 dnl
 dnl    ****  the end  ****
