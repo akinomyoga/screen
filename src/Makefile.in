@@ -181,7 +181,6 @@ tags TAGS: $(CFILES)
 
 dist: .version $(SCREEN).tar.gz
 
-
 $(SCREEN).tar: .version term.h comm.h tty.c kmapdef.c
 	-rm -rf dist
 	mkdir dist
