@@ -135,6 +135,8 @@ static void ShowInfo __P((void));
 static void ShowDInfo __P((void));
 static struct win *WindowByName __P((char *));
 static int  WindowByNumber __P((char *));
+static const char*  ParseCjkWidthGetName __P((int));
+static int  ParseCjkWidth __P((struct action *, int *));
 static int  ParseOnOff __P((struct action *, int *));
 static int  ParseWinNum __P((struct action *, int *));
 static int  ParseBase __P((struct action *, char *, int *, int, char *));
@@ -4590,10 +4592,10 @@ int key;
       break;
 #ifdef DW_CHARS
     case RC_CJKWIDTH:
-      if(ParseSwitch(act, &cjkwidth) == 0)
+      if(ParseCjkWidth(act, &cjkwidth) == 0)
       {
         if(msgok)
-          OutputMsg(0, "Treat ambiguous width characters as %s width", cjkwidth ? "full" : "half");
+          OutputMsg(0, "cjkwidth: Set cjkwidth mode to %s width", ParseCjkWidthGetName(cjkwidth));
       }
       break;
 #endif
@@ -4954,6 +4956,64 @@ int e, me;
 	}
     }
 }
+
+static struct{
+  const char* name;
+  int value;
+} cjkwidth_parse_names[]={
+  {"half",0},
+  {"full",1},
+  {"emacs",2},
+  {"off",0},
+  {"on",1},
+};
+
+// KM: modified ParseSwitch(act,var);
+static int
+ParseCjkWidth(act, var)
+     struct action* act;
+     int* var;
+{
+  if(*act->args == 0){
+    // toggle
+
+    if(*var)
+      *var = 0; // ambiguous_is_half
+    else
+      *var = 1; // ambiguous_is_full
+  }else{
+    int num = -1;
+    char** args = act->args;
+    if(args[1] == 0){
+      int i;
+      for(i=0; i<sizeof(cjkwidth_parse_names)/sizeof(cjkwidth_parse_names[0]); i++){
+        if(strcmp(args[0], cjkwidth_parse_names[i].name) == 0){
+          num=cjkwidth_parse_names[i].value;
+        }
+      }
+    }
+    if(num<0){
+      Msg(0, "%s: %s: invalid argument. Give 'full', 'half' or 'emacs'", rc_name, comms[act->nr].name);
+      return -1;
+    }
+    *var=num;
+  }
+
+  return 0;
+}
+
+static const char*
+ParseCjkWidthGetName(value)
+     int value;
+{
+  int i;
+  for(i=0; i<sizeof(cjkwidth_parse_names)/sizeof(cjkwidth_parse_names[0]); i++){
+    if(value==cjkwidth_parse_names[i].value)
+      return cjkwidth_parse_names[i].name;
+  }
+  return value?"full":"half";
+}
+
 
 int
 ParseSwitch(act, var)

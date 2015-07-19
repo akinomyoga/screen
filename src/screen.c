@@ -817,7 +817,7 @@ char **av;
     {
       if(!strncmp(s, "zh_", 3) || !strncmp(s, "ja_", 3) || !strncmp(s, "ko_", 3))
       {
-        cjkwidth = 1;
+        cjkwidth = 2;
       }
     }
   }
