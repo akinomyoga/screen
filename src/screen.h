@@ -266,7 +266,7 @@ extern char **NewEnv;
 
 extern bool adaptflag;
 extern bool auto_detach;
-extern bool cjkwidth;
+extern int cjkwidth;
 extern bool default_startup;
 extern bool hastruecolor;
 extern bool iflag;
