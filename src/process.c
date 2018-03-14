@@ -83,6 +83,8 @@ static void ShowDInfo(void);
 static Window *WindowByName(char *);
 static int WindowByNumber(char *);
 static int ParseSwitch(struct action *, bool *);
+static const char* ParseCjkWidthGetName(int);
+static int ParseCjkWidth(struct action *, int *);
 static int ParseOnOff(struct action *, bool *);
 static int ParseWinNum(struct action *, int *);
 static int ParseBase(struct action *, char *, int *, int, char *);
@@ -2028,8 +2030,8 @@ static void DoCommandWritelock(struct action *act)
 				return;
 			fore->w_wlock = b ? WLOCK_ON : WLOCK_OFF;
 		}
-		/* 
-		 * user may have permission to change the writelock setting, 
+		/*
+		 * user may have permission to change the writelock setting,
 		 * but he may never aquire the lock himself without write permission
 		 */
 		if (!AclCheckPermWin(D_user, ACL_WRITE, fore))
@@ -4652,11 +4654,12 @@ static void DoCommandCjkwidth(struct action *act)
 {
 	int msgok = display && !*rc_name;
 
-	if (ParseSwitch(act, &cjkwidth) == 0) {
-		if (msgok)
-			OutputMsg(0, "Treat ambiguous width characters as %s width",
-				  cjkwidth ? "full" : "half");
-	}
+	if (ParseCjkWidth(act, &cjkwidth) == 0)
+		{
+			if (msgok)
+				OutputMsg(0, "cjkwidth: Set cjkwidth mode to %s width",
+					ParseCjkWidthGetName(cjkwidth));
+		}
 }
 
 static void DoCommandTruecolor(struct action *act)
@@ -5547,6 +5550,56 @@ void SetEscape(struct acluser *u, int e, int me)
 			}
 		}
 	}
+}
+
+static struct{
+	const char* name;
+	int value;
+} cjkwidth_parse_names[]={
+	{"half",0},
+	{"full",1},
+	{"emacs",2},
+	{"off",0},
+	{"on",1},
+};
+
+// modified ParseSwitch(act,var); @akinomyoga
+static int ParseCjkWidth(struct action* act, int* var) {
+	if (*act->args == 0) {
+		// toggle
+
+		if (*var)
+			*var = 0; // ambiguous_is_half
+		else
+			*var = 1; // ambiguous_is_full
+	} else {
+		int num = -1;
+		char** args = act->args;
+		if (args[1] == 0) {
+			int i;
+			for (i = 0; i < sizeof(cjkwidth_parse_names) / sizeof(cjkwidth_parse_names[0]); i++){
+				if (strcmp(args[0], cjkwidth_parse_names[i].name) == 0) {
+					num = cjkwidth_parse_names[i].value;
+				}
+			}
+		}
+		if (num < 0) {
+			Msg(0, "%s: %s: invalid argument. Give 'full', 'half' or 'emacs'", rc_name, comms[act->nr].name);
+			return -1;
+		}
+		*var = num;
+	}
+
+	return 0;
+}
+
+static const char* ParseCjkWidthGetName(int value) {
+	int i;
+	for (i = 0; i < sizeof(cjkwidth_parse_names) / sizeof(cjkwidth_parse_names[0]); i++) {
+		if (value == cjkwidth_parse_names[i].value)
+		  return cjkwidth_parse_names[i].name;
+	}
+	return value ? "full" : "half";
 }
 
 static int ParseSwitch(struct action *act, bool *var)
@@ -7398,7 +7451,7 @@ void ApplyAttrColor(uint64_t i, struct mchar *mc)
 	if (h & 0x04) f |= 0x04000000;
 	if (h & 0x02) f |= 0x02000000;
 	if (h & 0x01) f |= 0x01000000;
-	
+
 	mc->attr	= a;
 	mc->colorbg	= b;
 	mc->colorfg	= f;
