@@ -407,7 +407,13 @@ static void makeuser(struct utmpx *u, char *line, char *user, pid_t pid)
 	/* must use temp variable because of NetBSD/sparc64, where
 	 * ut_xtime is long(64) but time_t is int(32) */
 	(void)time(&now);
-	u->ut_tv.tv_sec = now;
+
+#ifdef USE_UT_TIME /* @akinomyoga */
+  /* please define USE_UT_TIME if is defined */
+  u->ut_time = now;
+#else
+  u->ut_tv.tv_sec = now;
+#endif
 }
 
 static slot_t TtyNameSlot(char *name)
@@ -416,4 +422,3 @@ static slot_t TtyNameSlot(char *name)
 }
 
 #endif				/* ENABLE_UTMP */
-

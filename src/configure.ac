@@ -198,6 +198,15 @@ AS_IF([test "x$with_pty_rofs" == "xyes"], [
 	AC_DEFINE(PTY_ROFS)
 ])
 
+dnl -- workaround for cygwin by @akinomyoga
+AC_ARG_ENABLE(ut_time, AS_HELP_STRING([--enable-ut_time],
+        [use utmp::ut_time instead of utmp::ut_tv]),
+        [enable_ut_time=$enableval],
+        [enable_ut_time=no])
+AS_IF([test "x$enable_ut_time" = "xyes"], [
+  AC_DEFINE([USE_UT_TIME],[],[use utmp::ut_time instead of utmp::ut_tv])
+])
+
 dnl
 dnl Generate files from *.in ones
 dnl
