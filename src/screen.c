@@ -837,7 +837,7 @@ int main(int ac, char** av)
     char *s;
     if ((s = locale_name())) {
       if(!strncmp(s, "zh_", 3) || !strncmp(s, "ja_", 3) || !strncmp(s, "ko_", 3)) {
-        cjkwidth = 1;
+        cjkwidth = 2;
       }
     }
   }
