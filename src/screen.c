@@ -149,7 +149,7 @@ char *preselect = NULL;		/* only used in Attach() */
 
 char *screenencodings;
 
-bool cjkwidth;
+int cjkwidth;
 
 Layer *flayer;
 Window *fore;
@@ -600,7 +600,7 @@ int main(int argc, char **argv)
 		char *s;
 		if ((s = locale_name())) {
 			if (!strncmp(s, "zh_", 3) || !strncmp(s, "ja_", 3) || !strncmp(s, "ko_", 3)) {
-				cjkwidth = 1;
+				cjkwidth = 2;
 			}
 		}
 	}
