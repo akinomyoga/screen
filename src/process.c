@@ -7284,10 +7284,43 @@ uint64_t ParseAttrColor(char *str, int msgok)
 
 	uint32_t *cl;
 	uint8_t *cm;
+	bool parse_color_flag = 0;
 	cl = &fg;
 	cm = &fm;
 
 	while (*str) {
+		if (parse_color_flag) {
+			bool processed = 0;
+			switch(*str) {
+			case '.': goto Next;
+			case 'k': *cl = 000; *cm = 1; goto Next;
+			case 'r': *cl = 001; *cm = 1; goto Next;
+			case 'g': *cl = 002; *cm = 1; goto Next;
+			case 'y': *cl = 003; *cm = 1; goto Next;
+			case 'b': *cl = 004; *cm = 1; goto Next;
+			case 'm': *cl = 005; *cm = 1; goto Next;
+			case 'c': *cl = 006; *cm = 1; goto Next;
+			case 'w': *cl = 007; *cm = 1; goto Next;
+			case 'K': *cl = 010; *cm = 1; goto Next;
+			case 'R': *cl = 011; *cm = 1; goto Next;
+			case 'G': *cl = 012; *cm = 1; goto Next;
+			case 'Y': *cl = 013; *cm = 1; goto Next;
+			case 'B': *cl = 014; *cm = 1; goto Next;
+			case 'M': *cl = 015; *cm = 1; goto Next;
+			case 'C': *cl = 016; *cm = 1; goto Next;
+			case 'W': *cl = 017; *cm = 1; goto Next;
+			Next:
+				cl = &fg;
+				cm = &fm;
+				processed = 1;
+				break;
+			}
+			if (processed) {
+				str++;
+				continue;
+			}
+		}
+
 		if (*cm < 4) {
 			switch (*str) {
 			case 'd':
@@ -7333,7 +7366,11 @@ uint64_t ParseAttrColor(char *str, int msgok)
 				cl = &bg;
 				cm = &bm;
 				break;
+			case '=': break;
 			case ' ':
+				parse_color_flag = 1;
+				cl = &bg;
+				cm = &bm;
 				break;
 			default:
 				if (msgok)
