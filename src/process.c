@@ -4662,6 +4662,11 @@ static void DoCommandCjkwidth(struct action *act)
 		}
 }
 
+static void DoCommandAttachPassword(struct action *act)
+{
+	(void) ParseOnOff(act, &opt_attach_ask_password);
+}
+
 static void DoCommandTruecolor(struct action *act)
 {
 	if (ParseOnOff(act, &hastruecolor) == 0)
@@ -5258,6 +5263,9 @@ void DoAction(struct action *act)
 		break;
 	case RC_TRUECOLOR:
 		DoCommandTruecolor(act);
+		break;
+	case RC_ATTACH_PASSWORD:
+		DoCommandAttachPassword(act);
 		break;
 	default:
 		break;

@@ -150,6 +150,7 @@ char *preselect = NULL;		/* only used in Attach() */
 char *screenencodings;
 
 int cjkwidth;
+bool opt_attach_ask_password = 1;
 
 Layer *flayer;
 Window *fore;
