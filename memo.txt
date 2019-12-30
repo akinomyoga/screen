@@ -1,0 +1,151 @@
+
+2019-12-30
+
+* 今度は screen-4.7.0 で条件が反転している。何故か。
+
+  {FILE*f=fopen("/dev/pts/6","w");
+  fprintf(f,"ev=%p win=%p D_fore=%p mflg=%d\n",ev,win,D_fore,minusflg);fclose(f);}
+
+  これで試してみた所 %F の判定自体は問題なくできている気がする。
+  うーん。指定の = を消してみたら動くようになった。
+  = の意味を勘違いしている? うーん確認してみたが別に勘違いはしていない気がする。
+  よく分からない。分からないが取り敢えず = を使わない方向で回避する事にした。
+
+  何が起こっているのか分かった気がする。
+  前景色と背景色の指定の順序が逆なんだ。bg が先で fg が後。
+  説明書を見たらちゃんとそう書いてある。
+  https://www.gnu.org/software/screen/manual/html_node/String-Escapes.html
+
+  つまり、master-modified の方を再度修正する必要がある。
+
+* "windowlist string" が screen-4.99 で動かなくなっている
+
+  | winmsg_esc_ex(Focus, Window *win, Event *ev)
+  | {
+  | 	/* small hack (TODO: explain.) */
+  | 	if (display && ((ev && ev == &D_forecv->c_captev) || (!ev && win && win == D_fore)))
+  | 		esc->flags.minus ^= 1;
+  | #begin debug
+  |   {FILE* f=fopen("/dev/pts/9","w");
+  |   fprintf(f,"%d %d %d %d %d\n",!!display,!!ev,ev && ev == &D_forecv->c_captev,!!win,win && win == D_fore);
+  |   fclose(f);}
+  | #end debug
+  |
+  | 	if (esc->flags.minus)
+  | 		wmc_set(cond);
+  | }
+  |
+  | 上を試すと必ず 1 0 0 1 0 になる。つまり必ず false
+  | (というか screen-4.6.2 の時点でもずっと条件が反転していた気もする。)
+  |
+  | 古い screen-4.6.2 で試してみた所、どうも昔から必ず false になっていた様だ。
+  | 然し、%{ bW} が "上書き" だったので反転属性が保持されて区別できて見えたという事。
+
+  結局昔から常に %F は false だったという事。
+  今回新しく前の属性を継承しなくなった為に前と同じ様に設定する事ができなくなった。
+
+  https://www.gnu.org/software/screen/manual/html_node/String-Escapes.html#String-Escapes
+  説明書を読むと実は %F はそもそも windowlist ではなくて caption 用だった?
+  実際に caption always ... に %F による分岐を入れてみると動いている。
+  これは pane 毎に T/F が決まる物であって各 window に対して値が決まる物ではない?
+
+  ソースコードを追って気づいたが
+
+  * そもそも %{} を使ってもその場で着色を変更する事はできない。
+    何処かに結果を格納しているのである。これだと全体の色が変化する様な気がする。
+    と思って以下を試したらちゃんと途中で色が変化している。。
+      windowlist string "Hello%{ .r}R%{ .g}G%{ .b}B%4n %t%=%f"
+      windowlist string "%{ R}R%{ G}G%{ B}B %4n %t%=%f"
+
+    ? 何処で色を出力しているのだろう。
+
+      | 試しに str の中身を出力してみたがやはり色は出力されていない。
+      | という事は色を出力しているのは LPutWinMsg なのだろう。
+      | 調べると mchar という引数を使って属性を指定している様子だ。
+      |
+      | 然し、そうだとすると文字列の途中で色を変えるのがちゃんと動いているのが謎だ。
+      | mchar は単一の属性である。配列という訳ではない。SetRendition の実装を見たが
+      | 単純に受け取った mchar を反映しているだけである。
+      | 不思議だ何が起こっているのか…。
+      |
+      | str の中に見えない文字が埋め込まれているという可能性を考えたが、
+      | 実際に文字数を出力してみると画面の幅 182 と同じである。
+      | つまり str 自体には特別な情報は格納されていない。
+
+      分かった。LPutWinMsg (layer.c) のループは文字のループではなくて描画対象の検索のループだった。
+      そして実際に描画を行っているのは PutWinMsg (screen.c) という関数であった。
+      その関数の中では g_winmsg->rend[] に格納されている情報を参照してる。
+      g_winmsg 関連のコードを調べると temporary, work with existing codes 云々
+      と書かれている。グローバル変数を使っているのは移行途中の暫定的な実装なのだろう。
+      取り敢えず色を保存している箇所は分かった。
+
+      取り敢えず書き換えたコードは元に戻す。
+
+      | diff --git a/src/list_window.c b/src/list_window.c
+      | index ef9efa8..3d424e0 100644
+      | --- a/src/list_window.c
+      | +++ b/src/list_window.c
+      | @@ -204,6 +204,8 @@ static int gl_Window_row(ListData *ldata, ListRow *lrow)
+      |  	struct mchar *mchar;
+      |  	struct mchar mchar_rend = mchar_blank;
+      |  	struct gl_Window_Data *wdata = ldata->data;
+      | +FILE* f=fopen("/dev/pts/9","w");
+      | +Window *save_foreground_window = D_fore;
+      |
+      |  	w = lrow->data;
+      |
+      | @@ -214,25 +216,35 @@ static int gl_Window_row(ListData *ldata, ListRow *lrow)
+      |
+      |  	for (xoff = 0, g = w->w_group; g != wdata->group; g = g->w_group)
+      |  		xoff += 2;
+      | +	if (ldata->selected == lrow) D_fore = w;
+      |  	str = MakeWinMsgEv(NULL, wliststr, w, '%', flayer->l_width - xoff, NULL, 0);
+      | -	if (ldata->selected == lrow)
+      | +	if (ldata->selected == lrow) D_fore = save_foreground_window;
+      | +fprintf(f,"str=(\e[m%s\e[m)#%d\n",str,(int)strlen(str));
+      | +	if (ldata->selected == lrow) {
+      |  		mchar = &mchar_so;
+      | -	else if (w->w_monitor == MON_DONE && renditions[REND_MONITOR] != 0) {
+      | +		fprintf(f,"Sel\n");
+      | +	} else if (w->w_monitor == MON_DONE && renditions[REND_MONITOR] != 0) {
+      |  		mchar = &mchar_rend;
+      |  		ApplyAttrColor(renditions[REND_MONITOR], mchar);
+      | +		fprintf(f,"Mon\n");
+      |  	} else if ((w->w_bell == BELL_DONE || w->w_bell == BELL_FOUND) && renditions[REND_BELL] != 0) {
+      |  		mchar = &mchar_rend;
+      |  		ApplyAttrColor(renditions[REND_BELL], mchar);
+      | +		fprintf(f,"Bel\n");
+      |  	} else if ((w->w_silence == SILENCE_FOUND || w->w_silence == SILENCE_DONE) && renditions[REND_SILENCE] != 0) {
+      |  		mchar = &mchar_rend;
+      |  		ApplyAttrColor(renditions[REND_SILENCE], mchar);
+      | -	} else
+      | +		fprintf(f,"Silence\n");
+      | +	} else {
+      |  		mchar = &mchar_blank;
+      | +		fprintf(f,"Blank\n");
+      | +	}
+      |
+      |  	LPutWinMsg(flayer, str, flayer->l_width, mchar, xoff, lrow->y);
+      |  	if (xoff)
+      |  		LPutWinMsg(flayer, "", xoff, mchar, 0, lrow->y);
+      |
+      | +fclose(f);
+      |  	return 1;
+      |  }
+
+  * rendition[READ_XXXX]?
+
+    % rendition[REND_{MONITOR,SILENCE,BELL}] 云々という変数で着色を決めている気がする。
+    % そしてこれは "rendition monitor ..." というコマンドで描画属性を指定できる様になっている。
+    % そしてこれらの rendition 値は window list の表示とそれから
+    % AddWindows という関数の中でしか使われていない。
+    % つまり window list で項目を表示する時専用の設定の様に見える。
+    % →と思って実際にコマンドを実行してみたが何も変化はない。うーん。
+
+    実際にどういう風に実行されているかを確かめてみた所、
+    MONITOR,SILENCE,BELL は何れも特殊な状態の window であって、
+    通常の選択されている window、選択されていない window に関しては効果はない様子だ。
+
+  * うーん。結局どうしたら良いのかというと。
+
+    取り敢えず %F が使える様に一時的に選択されている行を D_fore に設定する事にした。
