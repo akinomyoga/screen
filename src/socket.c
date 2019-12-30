@@ -831,7 +831,10 @@ void ReceiveMsg(void)
 	case MSG_ATTACH:
 		if (CreateTempDisplay(&m, recvfd, win))
 			break;
-		AskPassword(&m);
+		if (opt_attach_ask_password)
+			AskPassword(&m);
+		else
+			FinishAttach(&m);
 		break;
 	case MSG_ERROR:
 		{
@@ -1150,12 +1153,12 @@ static bool CheckPassword(const char *password) {
 	int pam_ret;
 	char *tty_name;
 
-	reply = (struct pam_response *)malloc(sizeof(struct pam_response));  
+	reply = (struct pam_response *)malloc(sizeof(struct pam_response));
 
-	reply[0].resp = strdup(password);  
-	reply[0].resp_retcode = 0;  
+	reply[0].resp = strdup(password);
+	reply[0].resp_retcode = 0;
 
-	pamc.conv = &screen_conv; 
+	pamc.conv = &screen_conv;
 	pamc.appdata_ptr = (void *)reply;
 	pam_ret= pam_start("screen", ppp->pw_name, &pamc, &pamh);
 	if (pam_ret!= PAM_SUCCESS) {
