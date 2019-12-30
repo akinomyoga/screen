@@ -277,6 +277,7 @@ extern bool wipeflag;
 extern bool xflag;
 /* Indicator whether the current tty exists in another namespace. */
 extern bool attach_tty_is_in_new_ns;
+extern bool opt_attach_ask_password;
 
 extern int af;
 extern int attach_fd;
