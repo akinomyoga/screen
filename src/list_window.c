@@ -241,6 +241,7 @@ gl_Window_row(struct ListData *ldata, struct ListRow *lrow)
   struct mchar *mchar;
   struct mchar mchar_rend = mchar_blank;
   struct gl_Window_Data *wdata = ldata->data;
+	struct win *save_foreground_window = D_fore;
 
   w = lrow->data;
 
@@ -251,7 +252,9 @@ gl_Window_row(struct ListData *ldata, struct ListRow *lrow)
 
   for (xoff = 0, g = w->w_group; g != wdata->group; g = g->w_group)
     xoff += 2;
+	if (ldata->selected == lrow) D_fore = w;
   str = MakeWinMsgEv(wliststr, w, '%', flayer->l_width - xoff, NULL, 0);
+	if (ldata->selected == lrow) D_fore = save_foreground_window;
   if (ldata->selected == lrow)
     mchar = &mchar_so;
   else if (w->w_monitor == MON_DONE && renditions[REND_MONITOR] != -1)
@@ -705,4 +708,3 @@ WListLinkChanged()
       }
   display = olddisplay;
 }
-
