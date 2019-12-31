@@ -1700,7 +1700,7 @@ static void ASetMode(Window *win, bool on)
 }
 
 static char rendlist[] = {
-	~((1 << NATTR) - 1), A_BD, A_DI, A_IT, A_US, A_BL, 0, A_RV, 0, 0,
+	~((1 << NATTR) - 1), A_BD, A_DI, A_IT, A_US, A_BL, 0, A_RV, 0, A_DI,
 	0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 	0, 0, ~(A_BD | A_DI), ~A_IT, ~A_US, ~A_BL, 0, ~A_RV
 };
