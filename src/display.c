@@ -33,7 +33,6 @@
 #include <sys/types.h>
 #include <signal.h>
 #include <fcntl.h>
-#include <poll.h>
 #include <sys/ioctl.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -1705,7 +1704,7 @@ void RefreshHStatus(void)
 			 (D_HS && D_has_hstatus == HSTATUS_HS && D_WS > 0) ? D_WS : D_width - !D_CLP + extrabytes, &D_hstatusev, 0);
 	if (buf && *buf) {
 		ShowHStatus(buf);
-		if (D_has_hstatus != HSTATUS_IGNORE && D_hstatusev.timeout)
+		if (D_has_hstatus != HSTATUS_IGNORE && D_hstatusev.timeout.tv_sec)
 			evenq(&D_hstatusev);
 	} else
 		ShowHStatus(NULL);
@@ -1774,7 +1773,7 @@ void RefreshLine(int y, int from, int to, int isblank)
 				    MakeWinMsgEv(NULL, captionstring, p, '%',
 						 cv->c_xe - cv->c_xs + (cv->c_xe + 1 < D_width
 									|| D_CLP) + extrabytes, &cv->c_captev, 0);
-				if (cv->c_captev.timeout)
+				if (cv->c_captev.timeout.tv_sec)
 					evenq(&cv->c_captev);
 				xx = to > cv->c_xe ? cv->c_xe : to;
 				l = strlen(buf);
@@ -2226,13 +2225,13 @@ void Flush(int progress)
 	}
 	while (l) {
 		if (progress) {
-			struct pollfd pfd[1];
-
-			pfd[0].fd = D_userfd;
-			pfd[0].events = POLLOUT;
-
-			wr = poll(pfd, ARRAY_SIZE(pfd), progress / 1000);
-
+			fd_set w;
+			FD_ZERO(&w);
+			FD_SET(D_userfd, &w);
+			struct timeval t;
+			t.tv_sec = progress;
+			t.tv_usec = 0;
+			wr = select(FD_SETSIZE, (fd_set *) 0, &w, (fd_set *) 0, &t);
 			if (wr == -1) {
 				if (errno == EINTR)
 					continue;
@@ -2312,8 +2311,9 @@ void Resize_obuf(void)
 
 void DisplaySleep1000(int n, int eat)
 {
-	struct pollfd pfd[1];
 	char buf;
+	fd_set r;
+	struct timeval t;
 
 	if (n <= 0)
 		return;
@@ -2321,11 +2321,11 @@ void DisplaySleep1000(int n, int eat)
 		usleep(1000 * n);
 		return;
 	}
-
-	pfd[0].fd = D_userfd;
-	pfd[0].events = POLLIN;
-
-	if (poll(pfd, ARRAY_SIZE(pfd), n) > 0) {
+	t.tv_usec = (n % 1000) * 1000;
+	t.tv_sec = n / 1000;
+	FD_ZERO(&r);
+	FD_SET(D_userfd, &r);
+	if (select(FD_SETSIZE, &r, (fd_set *) 0, (fd_set *) 0, &t) > 0) {
 		if (eat)
 			read(D_userfd, &buf, 1);
 	}

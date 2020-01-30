@@ -30,7 +30,6 @@
 
 #include "sched.h"
 
-#include <poll.h>
 #include <stdint.h>
 #include <sys/types.h>
 #include <time.h>
@@ -42,16 +41,11 @@ static Event *evs;
 static Event *tevs;
 static Event *nextev;
 static int calctimeout;
-static struct pollfd *pfd;
-static int pfd_cnt;
-
 
 static Event *calctimo(void);
 
 void evenq(Event *ev)
 {
-	int i = 0;
-
 	Event *evp, **evpp;
 	if (ev->queued)
 		return;
@@ -60,23 +54,12 @@ void evenq(Event *ev)
 		calctimeout = 1;
 		evpp = &tevs;
 	}
-
 	for (; (evp = *evpp); evpp = &evp->next)
 		if (ev->priority > evp->priority)
 			break;
 	ev->next = evp;
 	*evpp = ev;
 	ev->queued = true;
-
-	/* check if we need more pollfd */
-	for (evp = evs; evp; evp = evp->next)
-		if (evp->type == EV_READ || evp->type == EV_WRITE)
-			i++;
-
-	if (i > pfd_cnt) {
-		pfd_cnt = i;
-		pfd = realloc(pfd, pfd_cnt * sizeof(struct pollfd));
-	}
 }
 
 void evdeq(Event *ev)
@@ -96,11 +79,6 @@ void evdeq(Event *ev)
 	ev->queued = false;
 	if (ev == nextev)
 		nextev = nextev->next;
-
-	/* mark fd to be skipped (see checks in sched()) */
-	for (int i = 0; i < pfd_cnt; i++)
-		if (pfd[i].fd == ev->fd)
-			pfd[i].fd = -pfd[i].fd;
 }
 
 static Event *calctimo(void)
@@ -110,11 +88,13 @@ static Event *calctimo(void)
 
 	if ((min = tevs) == NULL)
 		return NULL;
-	mins = min->timeout;
+	mins = min->timeout.tv_sec;
 	for (ev = tevs->next; ev; ev = ev->next) {
-		if (mins > ev->timeout) {
+		if (mins < ev->timeout.tv_sec)
+			continue;
+		if (mins > ev->timeout.tv_sec || min->timeout.tv_usec > ev->timeout.tv_usec) {
 			min = ev;
-			mins = ev->timeout;
+			mins = ev->timeout.tv_sec;
 		}
 	}
 	return min;
@@ -123,93 +103,78 @@ static Event *calctimo(void)
 void sched(void)
 {
 	Event *ev;
+	fd_set r, w, *set;
 	Event *timeoutev = NULL;
-	int timeout;
-	int i, n;
+	struct timeval timeout;
+	int nsel;
 
 	for (;;) {
 		if (calctimeout)
 			timeoutev = calctimo();
 		if (timeoutev) {
-			struct timeval now;
-			gettimeofday(&now, NULL);
+			gettimeofday(&timeout, NULL);
 			/* tp - timeout */
-			timeout = timeoutev->timeout - (now.tv_sec * 1000 + now.tv_usec / 1000);
-			if (timeout < 0)
-				timeout = 0;
+			timeout.tv_sec = timeoutev->timeout.tv_sec - timeout.tv_sec;
+			timeout.tv_usec = timeoutev->timeout.tv_usec - timeout.tv_usec;
+			if (timeout.tv_usec < 0) {
+				timeout.tv_usec += 1000000;
+				timeout.tv_sec--;
+			}
+			if (timeout.tv_sec < 0) {
+				timeout.tv_usec = 0;
+				timeout.tv_sec = 0;
+			}
 		}
 
-		memset(pfd, 0, sizeof(struct pollfd) * pfd_cnt);
-		i = 0;
+		FD_ZERO(&r);
+		FD_ZERO(&w);
 		for (ev = evs; ev; ev = ev->next) {
-			if (ev->condpos && *ev->condpos <= (ev->condneg ? *ev->condneg : 0))
-				goto skip;
-			if (ev->type == EV_READ) {
-				pfd[i].fd = ev->fd;
-				pfd[i].events = POLLIN;
-			} else if (ev->type == EV_WRITE) {
-				pfd[i].fd = ev->fd;
-				pfd[i].events = POLLOUT;
+			if (ev->condpos && *ev->condpos <= (ev->condneg ? *ev->condneg : 0)) {
+				continue;
 			}
-skip:
-			if (ev->type == EV_READ || ev->type == EV_WRITE)
-				i++;
+			if (ev->type == EV_READ)
+				FD_SET(ev->fd, &r);
+			else if (ev->type == EV_WRITE)
+				FD_SET(ev->fd, &w);
 		}
 
-		n = poll(pfd, i, timeoutev ? timeout : 0);
-		if (n < 0) {
+		nsel = select(FD_SETSIZE, &r, &w, (fd_set *) 0, timeoutev ? &timeout : NULL);
+		if (nsel < 0) {
 			if (errno != EINTR) {
-				Panic(errno, "poll");
+				Panic(errno, "select");
 			}
-			n = 0;
-		} else if (n == 0) {	/* timeout */
+			nsel = 0;
+		} else if (nsel == 0) {	/* timeout */
 			if (timeoutev) {
 				evdeq(timeoutev);
 				timeoutev->handler(timeoutev, timeoutev->data);
 			}
 		}
 
-		i = 0;
-
 		for (ev = evs; ev; ev = nextev) {
 			nextev = ev->next;
-			switch (ev->type) {
-			case EV_READ:
-			case EV_WRITE:
-				/* check if we parsed all events from poll()
-				 * if we did just continue, as we may still
-				 * need to run EV_ALWAYS event */
-				if (n == 0)
+			if (ev->type != EV_ALWAYS) {
+				set = ev->type == EV_READ ? &r : &w;
+				if (nsel == 0 || !FD_ISSET(ev->fd, set))
 					continue;
-				/* check if we have anything to do for EV_READ
-				 * or EV_WRITE, or if event is still queued,
-				 * if not skip to the next event */
-				if (!pfd[i].revents || pfd[i].fd < 0) {
-					i++;
-					continue;
-				}
-				/* this is one of events from poll(), decrease
-				 * counter */
-				n--;
-				/* advance pollfd pointer */
-				i++;
-				__attribute__ ((fallthrough));
-			default:
-				if (ev->condpos && *ev->condpos <= (ev->condneg ? *ev->condneg : 0))
-					continue;
-				ev->handler(ev, ev->data);
+				nsel--;
 			}
+			if (ev->condpos && *ev->condpos <= (ev->condneg ? *ev->condneg : 0))
+				continue;
+			ev->handler(ev, ev->data);
 		}
 	}
 }
 
 void SetTimeout(Event *ev, int timo)
 {
-	struct timeval now;
-	gettimeofday(&now, NULL);
-
-	ev->timeout = (now.tv_sec * 1000 + now.tv_usec / 1000) + timo;
-
+	gettimeofday(&ev->timeout, NULL);
+	ev->timeout.tv_sec += timo / 1000;
+	ev->timeout.tv_usec += (timo % 1000) * 1000;
+	if (ev->timeout.tv_usec > 1000000) {
+		ev->timeout.tv_usec -= 1000000;
+		ev->timeout.tv_sec++;
+	}
 	if (ev->queued)
 		calctimeout = 1;
 }
