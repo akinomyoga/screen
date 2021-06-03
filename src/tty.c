@@ -805,7 +805,7 @@ int TtyGrabConsole(int fd, bool on, char *rc_name)
 	Display *d;
 #ifdef SRIOCSREDIR
 	int cfd;
-#else
+#elif defined(TIOCCONS)
 	struct mode new1, new2;
 	char *slave;
 #endif
@@ -853,7 +853,7 @@ int TtyGrabConsole(int fd, bool on, char *rc_name)
 		return -1;
 	}
 	close(cfd);
-#else
+#elif defined(TIOCCONS)
 	/* special linux workaround for a too restrictive kernel */
 	if ((consredirfd[0] = OpenPTY(&slave)) < 0) {
 		Msg(errno, "%s: could not open detach pty master", rc_name);
@@ -875,6 +875,9 @@ int TtyGrabConsole(int fd, bool on, char *rc_name)
 		close(consredirfd[1]);
 		return -1;
 	}
+#else
+	(void) rc_name;
+	return -1;
 #endif
 	consredir_ev.fd = consredirfd[0];
 	consredir_ev.type = EV_READ;
