@@ -48,7 +48,7 @@
 
 #if ENABLE_PAM
 #include <security/pam_appl.h>
-#else
+#elif ENABLE_SHADOW
 #include <shadow.h>
 #endif
 
@@ -1191,7 +1191,7 @@ static bool CheckPassword(const char *password) {
 	return ret;
 }
 
-#else /* ENABLE_PAM */
+#elif defined(ENABLE_SHADOW) /* end of ENABLE_PAM */
 
 static bool CheckPassword(const char *password) {
 	bool ret = false;
@@ -1217,6 +1217,13 @@ static bool CheckPassword(const char *password) {
 
 	return ret;
 }
+
+#else
+
+static bool CheckPassword(const char *password) {
+	return true;
+}
+
 #endif /* ENABLE_PAM */
 
 static void PasswordProcessInput(char *ibuf, size_t ilen)

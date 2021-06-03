@@ -26,6 +26,7 @@ AH_TEMPLATE([HAVE_UT_HOST], [utmpx struct has ut_host field])
 
 dnl -
 AH_TEMPLATE([ENABLE_PAM], [Enable Pluggable Authentication Modules support])
+AH_TEMPLATE([ENABLE_SHADOW], [Enable shadow.h when PAM is unavailable])
 
 dnl -
 AH_TEMPLATE([ENABLE_TELNET], [Enable built-in telnet client])
@@ -99,6 +100,10 @@ AC_ARG_ENABLE(pam, AS_HELP_STRING([--enable-pam],
 	      [enable PAM support (default: enabled)]),
 	      [enable_pam=$enableval],
 	      [enable_pam=yes])
+AC_ARG_ENABLE(shadow, AS_HELP_STRING([--enable-shadow],
+	      [enable shadow.h when PAM is unavailable (default: enabled)]),
+	      [enable_shadow=$enableval],
+	      [enable_shadow=yes])
 AC_ARG_ENABLE(utmp, AS_HELP_STRING([--enable-utmp],
 	      [enable utmp support (default: disabled)]),
 	      [enable_utmp=$enableval],
@@ -141,6 +146,17 @@ AS_IF([test "x$enable_pam" = "xyes"], [
 		pam_end(0,0);
 	], AC_MSG_RESULT(yes);
 	AC_DEFINE(ENABLE_PAM),
+	AC_MSG_ERROR(no);LIBS="$oldlibs")
+])
+
+AS_IF([test "x$enable_pam" != "xyes" && test "x$enable_shadow" = "xyes"], [
+	AC_MSG_CHECKING(for shadow.h support)
+	oldlibs="$LIBS"
+	LIBS="$LIBS -lshadow"
+	AC_TRY_LINK([#include <shadow.h>], [
+    { struct spwd *p; p = getspnam("user"); }
+	], AC_MSG_RESULT(yes);
+	AC_DEFINE(ENABLE_SHADOW),
 	AC_MSG_ERROR(no);LIBS="$oldlibs")
 ])
 
@@ -219,6 +235,7 @@ echo ""
 echo "Configuration:"
 echo ""
 echo " PAM support: .............................. $enable_pam"
+echo " - shadow.h report: ........................ $enable_shadow"
 echo " telnet support: ........................... $enable_telnet"
 echo " utmp support: ............................. $enable_utmp"
 echo " global socket directory: .................. $enable_socket_dir"
